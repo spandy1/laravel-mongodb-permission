@@ -10,7 +10,6 @@ trait HasRoles
 
     public function initializeHasRoles(): void
     {
-        $this->casts['role_id'] = ObjectId::class;
     }
 
     public function role()
