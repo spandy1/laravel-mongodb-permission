@@ -15,32 +15,28 @@ trait HasPermissions
             'model_id',
             'permission_id'
         )
-        ->where('model_type', get_class($this))
-        ->where('guard_name', $this->getGuard());
+        ->wherePivot('model_type', get_class($this))
+        ->wherePivot('guard_name', $this->getGuard());
     }
 
     public function givePermissionTo(...$permissions)
     {
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_permissions');
+
         foreach (collect($permissions)->flatten() as $permission) {
             $permission = $this->getStoredPermission($permission);
 
-            DB::connection($this->getConnectionName())
-                ->collection(config('permission.collections.model_has_permissions'))
-                ->updateOne(
-                    [
-                        'permission_id' => $permission->getKey(),
-                        'model_type'    => get_class($this),
-                        'model_id'      => $this->getKey(),
-                        'guard_name'    => $permission->guard_name,
-                    ],
-                    ['$set' => [
-                        'permission_id' => $permission->getKey(),
-                        'model_type'    => get_class($this),
-                        'model_id'      => $this->getKey(),
-                        'guard_name'    => $permission->guard_name,
-                    ]],
-                    ['upsert' => true]
-                );
+            $attributes = [
+                'permission_id' => $permission->getKey(),
+                'model_type'    => get_class($this),
+                'model_id'      => $this->getKey(),
+                'guard_name'    => $permission->guard_name,
+            ];
+
+            DB::connection($conn)
+                ->table($table)
+                ->updateOrInsert($attributes, []);
         }
 
         $this->clearPermissionCache();
@@ -50,16 +46,18 @@ trait HasPermissions
 
     public function revokePermissionTo($permission)
     {
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_permissions');
+
         $permission = $this->getStoredPermission($permission);
 
-        DB::connection($this->getConnectionName())
-            ->collection(config('permission.collections.model_has_permissions'))
-            ->deleteOne([
-                'permission_id' => $permission->getKey(),
-                'model_type'    => get_class($this),
-                'model_id'      => $this->getKey(),
-                'guard_name'    => $permission->guard_name,
-            ]);
+        DB::connection($conn)
+            ->table($table)
+            ->where('permission_id', $permission->getKey())
+            ->where('model_type',    get_class($this))
+            ->where('model_id',      $this->getKey())
+            ->where('guard_name',    $permission->guard_name)
+            ->delete();
 
         $this->clearPermissionCache();
 
@@ -68,45 +66,57 @@ trait HasPermissions
 
     public function syncPermissions(...$permissions)
     {
-        DB::connection($this->getConnectionName())
-            ->collection(config('permission.collections.model_has_permissions'))
-            ->deleteMany([
-                'model_type' => get_class($this),
-                'model_id'   => $this->getKey(),
-            ]);
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_permissions');
 
+        // remove all existing
+        DB::connection($conn)
+            ->table($table)
+            ->where('model_type', get_class($this))
+            ->where('model_id',   $this->getKey())
+            ->delete();
+
+        // reassign
         return $this->givePermissionTo(...$permissions);
     }
 
     public function hasPermissionTo($permission): bool
     {
-        $cacheKey = 'permissions_for_user_' . $this->getKey();
+        $cacheKey  = 'permissions_for_user_' . $this->getKey();
+        $conn      = $this->getConnectionName();
+        $modelType = get_class($this);
 
         $all = cache()->remember(
             $cacheKey,
             config('permission.cache_ttl') * 60,
-            function () {
-                $conn = $this->getConnectionName();
-
+            function () use ($conn, $modelType) {
+                // direct perms
                 $direct = DB::connection($conn)
-                    ->collection(config('permission.collections.model_has_permissions'))
-                    ->where('model_type', get_class($this))
+                    ->table(config('permission.collections.model_has_permissions'))
+                    ->where('model_type', $modelType)
                     ->where('model_id',   $this->getKey())
-                    ->pluck('permission_id');
+                    ->pluck('permission_id')
+                    ->toArray();
 
-                $viaRoles = collect(
-                    DB::connection($conn)
-                        ->collection(config('permission.collections.model_has_roles'))
-                        ->where('model_type', get_class($this))
-                        ->where('model_id',   $this->getKey())
-                        ->pluck('role_id')
-                )
-                ->flatMap(fn($roleId) => DB::connection($conn)
-                    ->collection(config('permission.collections.role_has_permissions'))
-                    ->where('role_id', $roleId)
-                    ->pluck('permission_id'));
+                // via roles
+                $roleIds = DB::connection($conn)
+                    ->table(config('permission.collections.model_has_roles'))
+                    ->where('model_type', $modelType)
+                    ->where('model_id',   $this->getKey())
+                    ->pluck('role_id')
+                    ->toArray();
 
-                return collect($direct)->merge($viaRoles)->unique()->toArray();
+                $viaRoles = [];
+                foreach ($roleIds as $roleId) {
+                    $perms = DB::connection($conn)
+                        ->table(config('permission.collections.role_has_permissions'))
+                        ->where('role_id', $roleId)
+                        ->pluck('permission_id')
+                        ->toArray();
+                    $viaRoles = array_merge($viaRoles, $perms);
+                }
+
+                return array_unique(array_merge($direct, $viaRoles));
             }
         );
 

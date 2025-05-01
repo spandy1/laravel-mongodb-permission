@@ -15,32 +15,28 @@ trait HasRoles
             'model_id',
             'role_id'
         )
-        ->where('model_type', get_class($this))
-        ->where('guard_name', $this->getGuard());
+        ->wherePivot('model_type', get_class($this))
+        ->wherePivot('guard_name', $this->getGuard());
     }
 
     public function assignRole(...$roles)
     {
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_roles');
+
         foreach (collect($roles)->flatten() as $role) {
             $role = $this->getStoredRole($role);
 
-            DB::connection($this->getConnectionName())
-                ->collection(config('permission.collections.model_has_roles'))
-                ->updateOne(
-                    [
-                        'role_id'    => $role->getKey(),
-                        'model_type' => get_class($this),
-                        'model_id'   => $this->getKey(),
-                        'guard_name' => $role->guard_name,
-                    ],
-                    ['$set' => [
-                        'role_id'    => $role->getKey(),
-                        'model_type' => get_class($this),
-                        'model_id'   => $this->getKey(),
-                        'guard_name' => $role->guard_name,
-                    ]],
-                    ['upsert' => true]
-                );
+            $attributes = [
+                'role_id'    => $role->getKey(),
+                'model_type' => get_class($this),
+                'model_id'   => $this->getKey(),
+                'guard_name' => $role->guard_name,
+            ];
+
+            DB::connection($conn)
+                ->table($table)
+                ->updateOrInsert($attributes, []);
         }
 
         $this->clearPermissionCache();
@@ -50,16 +46,18 @@ trait HasRoles
 
     public function removeRole($role)
     {
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_roles');
+
         $role = $this->getStoredRole($role);
 
-        DB::connection($this->getConnectionName())
-            ->collection(config('permission.collections.model_has_roles'))
-            ->deleteOne([
-                'role_id'    => $role->getKey(),
-                'model_type' => get_class($this),
-                'model_id'   => $this->getKey(),
-                'guard_name' => $role->guard_name,
-            ]);
+        DB::connection($conn)
+            ->table($table)
+            ->where('role_id',    $role->getKey())
+            ->where('model_type', get_class($this))
+            ->where('model_id',   $this->getKey())
+            ->where('guard_name', $role->guard_name)
+            ->delete();
 
         $this->clearPermissionCache();
 
@@ -68,48 +66,53 @@ trait HasRoles
 
     public function syncRoles(...$roles)
     {
-        DB::connection($this->getConnectionName())
-            ->collection(config('permission.collections.model_has_roles'))
-            ->deleteMany([
-                'model_type' => get_class($this),
-                'model_id'   => $this->getKey(),
-            ]);
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_roles');
+
+        DB::connection($conn)
+            ->table($table)
+            ->where('model_type', get_class($this))
+            ->where('model_id',   $this->getKey())
+            ->delete();
 
         return $this->assignRole(...$roles);
     }
 
     public function hasRole($role): bool
     {
+        $conn  = $this->getConnectionName();
+        $table = config('permission.collections.model_has_roles');
+
         $role = $this->getStoredRole($role);
 
-        return (bool) DB::connection($this->getConnectionName())
-            ->collection(config('permission.collections.model_has_roles'))
-            ->where([
-                'role_id'    => $role->getKey(),
-                'model_type' => get_class($this),
-                'model_id'   => $this->getKey(),
-                'guard_name' => $role->guard_name,
-            ])
-            ->count();
+        return DB::connection($conn)
+            ->table($table)
+            ->where('role_id',    $role->getKey())
+            ->where('model_type', get_class($this))
+            ->where('model_id',   $this->getKey())
+            ->where('guard_name', $role->guard_name)
+            ->exists();
     }
 
     public function hasAnyRole(...$roles): bool
     {
-        foreach ($roles as $r) {
+        foreach (collect($roles)->flatten() as $r) {
             if ($this->hasRole($r)) {
                 return true;
             }
         }
+
         return false;
     }
 
     public function hasAllRoles(...$roles): bool
     {
-        foreach ($roles as $r) {
+        foreach (collect($roles)->flatten() as $r) {
             if (! $this->hasRole($r)) {
                 return false;
             }
         }
+
         return true;
     }
 
