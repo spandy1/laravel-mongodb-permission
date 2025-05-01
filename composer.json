@@ -14,7 +14,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Jimmy\\LaravelPermissionsMongoDB\\": "src/"
+            "Jimmy\\Permissions\\": "src/"
         }
     },
     "extra": {
