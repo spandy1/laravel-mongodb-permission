@@ -2,133 +2,51 @@
 
 namespace Jimmy\Permissions\Traits;
 
-use Illuminate\Support\Facades\DB;
 use Jimmy\Permissions\Models\Role;
 
 trait HasRoles
 {
-    public function roles()
+    public function role()
     {
-        return $this->belongsToMany(
-            Role::class,
-            config('permission.collections.model_has_roles'),
-            'model_id',
-            'role_id'
-        )
-        ->wherePivot('model_type', get_class($this))
-        ->wherePivot('guard_name', $this->getGuard());
+        return $this->belongsTo(Role::class, 'role_id', '_id');
     }
 
-    public function assignRole(...$roles)
+    public function assignRole($role)
     {
-        $conn  = $this->getConnectionName();
-        $table = config('permission.collections.model_has_roles');
-
-        foreach (collect($roles)->flatten() as $role) {
-            $role = $this->getStoredRole($role);
-
-            $attributes = [
-                'role_id'    => $role->getKey(),
-                'model_type' => get_class($this),
-                'model_id'   => $this->getKey(),
-                'guard_name' => $role->guard_name,
-            ];
-
-            DB::connection($conn)
-                ->table($table)
-                ->updateOrInsert($attributes, []);
-        }
-
-        $this->clearPermissionCache();
-
-        return $this;
-    }
-
-    public function removeRole($role)
-    {
-        $conn  = $this->getConnectionName();
-        $table = config('permission.collections.model_has_roles');
-
         $role = $this->getStoredRole($role);
-
-        DB::connection($conn)
-            ->table($table)
-            ->where('role_id',    $role->getKey())
-            ->where('model_type', get_class($this))
-            ->where('model_id',   $this->getKey())
-            ->where('guard_name', $role->guard_name)
-            ->delete();
-
-        $this->clearPermissionCache();
-
+        $this->role_id = $role->getKey();
+        $this->save();
+        cache()->forget('permissions_for_user_'.$this->getKey());
         return $this;
     }
 
-    public function syncRoles(...$roles)
+    public function removeRole()
     {
-        $conn  = $this->getConnectionName();
-        $table = config('permission.collections.model_has_roles');
-
-        DB::connection($conn)
-            ->table($table)
-            ->where('model_type', get_class($this))
-            ->where('model_id',   $this->getKey())
-            ->delete();
-
-        return $this->assignRole(...$roles);
+        $this->role_id = null;
+        $this->save();
+        cache()->forget('permissions_for_user_'.$this->getKey());
+        return $this;
     }
 
     public function hasRole($role): bool
     {
-        $conn  = $this->getConnectionName();
-        $table = config('permission.collections.model_has_roles');
-
         $role = $this->getStoredRole($role);
-
-        return DB::connection($conn)
-            ->table($table)
-            ->where('role_id',    $role->getKey())
-            ->where('model_type', get_class($this))
-            ->where('model_id',   $this->getKey())
-            ->where('guard_name', $role->guard_name)
-            ->exists();
-    }
-
-    public function hasAnyRole(...$roles): bool
-    {
-        foreach (collect($roles)->flatten() as $r) {
-            if ($this->hasRole($r)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public function hasAllRoles(...$roles): bool
-    {
-        foreach (collect($roles)->flatten() as $r) {
-            if (! $this->hasRole($r)) {
-                return false;
-            }
-        }
-
-        return true;
+        return (string)$this->role_id === (string)$role->getKey();
     }
 
     protected function getStoredRole($role): Role
     {
         if (is_string($role)) {
             return Role::where('name', $role)
-                       ->where('guard_name', $this->getGuard())
-                       ->firstOrFail();
+                ->where('guard_name', $this->getGuard())
+                ->firstOrFail();
         }
 
         if ($role instanceof Role) {
             return $role;
         }
 
-        throw new \InvalidArgumentException("Invalid role");
+        throw new \InvalidArgumentException('Invalid role');
     }
 
     protected function getGuard(): string
@@ -141,10 +59,5 @@ trait HasRoles
     public function getConnectionName(): string
     {
         return config('permission.connection') ?: config('database.default');
-    }
-
-    protected function clearPermissionCache()
-    {
-        cache()->forget('permissions_for_user_' . $this->getKey());
     }
 }

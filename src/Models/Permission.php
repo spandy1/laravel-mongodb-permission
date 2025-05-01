@@ -8,12 +8,12 @@ class Permission extends Model
 {
     protected $fillable = ['name', 'guard_name'];
 
-    public function getConnectionName()
+    public function getConnectionName(): string
     {
         return config('permission.connection') ?: parent::getConnectionName();
     }
 
-    public function getTable()
+    public function getTable(): string
     {
         return config('permission.collections.permissions');
     }
