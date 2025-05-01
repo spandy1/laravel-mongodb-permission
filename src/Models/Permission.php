@@ -2,18 +2,13 @@
 namespace Jimmy\Permissions\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
+use Jimmy\Permissions\Traits\InteractsWithGuard;
 
 class Permission extends Model
 {
+    use InteractsWithGuard;
+
     protected $fillable = ['name','guard_name'];
-
-    public function getConnectionName(): string
-    {
-        return config('permission.connection') ?: parent::getConnectionName();
-    }
-
     public function getTable(): string
-    {
-        return config('permission.collections.permissions');
-    }
+    { return config('permission.collections.permissions'); }
 }

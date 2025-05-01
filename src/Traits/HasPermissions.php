@@ -6,6 +6,8 @@ use Jimmy\Permissions\Models\Permission;
 
 trait HasPermissions
 {
+    use InteractsWithGuard;
+
     public function getRolePermissions()
     {
         return $this->role
@@ -15,27 +17,20 @@ trait HasPermissions
 
     public function hasPermissionTo($permission): bool
     {
-        $perm     = $this->getStoredPermission($permission);
-        $cacheKey = 'permissions_for_user_'.$this->getKey();
+        $perm     = $this->resolvePermission($permission);
         $allowed  = Cache::remember(
-            $cacheKey,
+            $this->cacheKey(),
             config('permission.cache_ttl')*60,
             fn() => $this->role->permission_ids ?? []
         );
-
         return in_array((string)$perm->getKey(), $allowed, true);
     }
 
-    protected function getStoredPermission($permission): Permission
+    protected function resolvePermission($permission): Permission
     {
-        if (is_string($permission)) {
-            return Permission::where('name', $permission)
-                ->where('guard_name', $this->role->guard_name)
-                ->firstOrFail();
-        }
-        if ($permission instanceof Permission) {
-            return $permission;
-        }
-        throw new \InvalidArgumentException('Invalid permission');
+        if ($permission instanceof Permission) return $permission;
+        return Permission::where('name', $permission)
+                         ->where('guard_name', $this->guardName())
+                         ->firstOrFail();
     }
 }
