@@ -1,5 +1,4 @@
 <?php
-
 namespace Jimmy\Permissions\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
@@ -7,8 +6,8 @@ use Jimmy\Permissions\Models\Permission;
 
 class Role extends Model
 {
-    protected $fillable = ['name', 'guard_name', 'permission_ids'];
-    protected $casts    = ['permission_ids' => 'array'];
+    protected $fillable = ['name','guard_name','permission_ids'];
+    protected $casts    = ['permission_ids'=>'array'];
 
     public function getConnectionName(): string
     {
@@ -25,13 +24,11 @@ class Role extends Model
         $perm = $this->getStoredPermission($permission);
         $ids  = $this->permission_ids ?? [];
         $key  = (string)$perm->getKey();
-
-        if (!in_array($key, $ids, true)) {
+        if (! in_array($key, $ids, true)) {
             $ids[] = $key;
             $this->permission_ids = $ids;
             $this->save();
         }
-
         return $this;
     }
 
@@ -40,13 +37,11 @@ class Role extends Model
         $perm = $this->getStoredPermission($permission);
         $ids  = $this->permission_ids ?? [];
         $key  = (string)$perm->getKey();
-
         if (($i = array_search($key, $ids, true)) !== false) {
             unset($ids[$i]);
             $this->permission_ids = array_values($ids);
             $this->save();
         }
-
         return $this;
     }
 
@@ -57,11 +52,9 @@ class Role extends Model
                 ->where('guard_name', $this->guard_name)
                 ->firstOrFail();
         }
-
         if ($permission instanceof Permission) {
             return $permission;
         }
-
         throw new \InvalidArgumentException('Invalid permission');
     }
 }

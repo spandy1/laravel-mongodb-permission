@@ -1,12 +1,11 @@
 <?php
-
 namespace Jimmy\Permissions\Models;
 
 use MongoDB\Laravel\Eloquent\Model;
 
 class Permission extends Model
 {
-    protected $fillable = ['name', 'guard_name'];
+    protected $fillable = ['name','guard_name'];
 
     public function getConnectionName(): string
     {

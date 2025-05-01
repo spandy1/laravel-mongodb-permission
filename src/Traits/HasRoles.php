@@ -1,5 +1,4 @@
 <?php
-
 namespace Jimmy\Permissions\Traits;
 
 use Jimmy\Permissions\Models\Role;
@@ -38,14 +37,12 @@ trait HasRoles
     {
         if (is_string($role)) {
             return Role::where('name', $role)
-                ->where('guard_name', $this->getGuard())
-                ->firstOrFail();
+                       ->where('guard_name', $this->getGuard())
+                       ->firstOrFail();
         }
-
         if ($role instanceof Role) {
             return $role;
         }
-
         throw new \InvalidArgumentException('Invalid role');
     }
 
@@ -54,10 +51,5 @@ trait HasRoles
         return property_exists($this, 'guard_name')
             ? $this->guard_name
             : config('auth.defaults.guard');
-    }
-
-    public function getConnectionName(): string
-    {
-        return config('permission.connection') ?: config('database.default');
     }
 }
