@@ -13,7 +13,7 @@ class CreateRoleHasPermissionsCollection extends Migration
             ->create(config('permission.collections.role_has_permissions'), function (Blueprint $collection) {
                 $collection->index(
                     ['permission_id','role_id','guard_name'],
-                    ['unique' => true]
+                    options: ['unique' => true]
                 );
             });
     }

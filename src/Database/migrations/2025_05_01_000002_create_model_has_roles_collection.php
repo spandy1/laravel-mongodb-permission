@@ -12,8 +12,13 @@ class CreateModelHasRolesCollection extends Migration
         Schema::connection($conn)
             ->create(config('permission.collections.model_has_roles'), function (Blueprint $collection) {
                 $collection->index(
-                    ['role_id','model_type','model_id','guard_name'],
-                    ['unique' => true]
+                    [
+                        'role_id'    => 1,
+                        'model_type' => 1,
+                        'model_id'   => 1,
+                        'guard_name' => 1,
+                    ],
+                    options: ['unique' => true]
                 );
             });
     }

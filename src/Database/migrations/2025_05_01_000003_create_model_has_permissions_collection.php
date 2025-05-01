@@ -13,7 +13,7 @@ class CreateModelHasPermissionsCollection extends Migration
             ->create(config('permission.collections.model_has_permissions'), function (Blueprint $collection) {
                 $collection->index(
                     ['permission_id','model_type','model_id','guard_name'],
-                    ['unique' => true]
+                    options: ['unique' => true]
                 );
             });
     }
