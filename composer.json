@@ -1,0 +1,27 @@
+{
+    "name": "jimmy/laravel-mongodb-permissions",
+    "description": "A RBAC (roles & permissions) package for Laravel 12 using MongoDB",
+    "keywords": ["laravel","mongodb","rbac","permissions","roles", "role", "spatie", "spatie/laravel-permission", "laravel-permission"],
+    "homepage": "https://github.com/spandy-cactus/laravel-mongodb-permission",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0",
+        "mongodb/laravel-mongodb": "^5.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0 || ^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jimmy\\LaravelPermissionsMongoDB\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jimmy\\Permissions\\Providers\\PermissionServiceProvider"
+            ]
+        }
+    }
+}
