@@ -135,7 +135,7 @@ trait HasRoles
             : config('auth.defaults.guard');
     }
 
-    protected function getConnectionName(): string
+    public function getConnectionName(): string
     {
         return config('permission.connection') ?: config('database.default');
     }
