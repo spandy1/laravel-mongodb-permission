@@ -2,7 +2,7 @@
     "name": "spandy1/laravel-mongodb-permissions",
     "description": "A RBAC (roles & permissions) package for Laravel 12 using MongoDB",
     "keywords": ["laravel","mongodb","rbac","permissions","roles", "role", "spatie", "spatie-laravel-permission", "laravel-permission"],
-    "homepage": "https://github.com/spandy-cactus/laravel-mongodb-permission",
+    "homepage": "https://github.com/spandy1/laravel-mongodb-permission",
     "license": "MIT",
     "require": {
         "php": "^8.2",
