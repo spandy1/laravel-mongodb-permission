@@ -3,59 +3,75 @@ namespace Jimmy\Permissions\Traits;
 
 use MongoDB\BSON\ObjectId;
 use Jimmy\Permissions\Models\Role;
+use Jimmy\Permissions\Casts\ObjectIdArray;
 
 trait HasRoles
 {
     use InteractsWithGuard;
 
+    /* ensure role_ids is cast to BSON array */
     public function initializeHasRoles(): void
     {
+        $this->casts['role_ids'] = ObjectIdArray::class;
     }
 
-    public function role()
+    /* return a collection of Role models */
+    public function roles()
     {
-        return $this->belongsTo(Role::class, 'role_id', '_id');
+        return Role::whereIn('_id', $this->role_ids ?? [])->get();
     }
 
-    public function assignRole($role)
+    public function assignRole(string|Role ...$roles)
     {
-        $role          = $this->resolveRole($role);
-        $this->role_id = new ObjectId((string)$role->getKey());
-        $this->save();
+        foreach ($roles as $role) {
+            $role = $this->resolveRole($role);
+            $this->push('role_ids', new ObjectId($role->getKey()), true);
+        }
         cache()->forget($this->cacheKey());
         return $this;
     }
 
-    public function removeRole()
+    public function removeRole(string|Role ...$roles)
     {
-        $this->role_id = null;
-        $this->save();
+        foreach ($roles as $role) {
+            $role = $this->resolveRole($role);
+            $this->pull('role_ids', new ObjectId($role->getKey()));
+        }
         cache()->forget($this->cacheKey());
         return $this;
     }
 
-    public function hasRole($role): bool
+    public function syncRoles(array $roles)
+    {
+        $this->role_ids = [];
+        $this->save();
+        return $this->assignRole(...$roles);
+    }
+
+    public function hasRole(string|Role $role): bool
     {
         $role = $this->resolveRole($role);
-        return (string)$this->role_id === (string)$role->getKey();
+        return in_array((string)$role->getKey(), array_map('strval', $this->role_ids ?? []), true);
     }
 
-    protected function resolveRole($role): Role
+    public function hasAnyRole(...$roles): bool
+    {
+        foreach ($roles as $r) if ($this->hasRole($r)) return true;
+        return false;
+    }
+
+    public function hasAllRoles(...$roles): bool
+    {
+        foreach ($roles as $r) if (! $this->hasRole($r)) return false;
+        return true;
+    }
+
+    protected function resolveRole(string|Role $role): Role
     {
         if ($role instanceof Role) return $role;
 
-        return Role::where('name', $role)
-            ->where('guard_name', $this->guardName())
+        return Role::where('name',$role)
+            ->where('guard_name',$this->guardName())
             ->firstOrFail();
-    }
-
-    public function getRoleId()
-    {
-        return (string)$this->role_id;
-    }
-
-    public function setRoleId($role_id): void
-    {
-        $this->role_id = new ObjectId($role_id);
     }
 }
